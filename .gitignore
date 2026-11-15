@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+
+# local-only caches (Colab uses Drive / /content instead, see src/jmem/paths.py)
+.swm_home/
+.jmem_data/
+checkpoints/
+outputs/
+multirun/
+
+# full upstream clone kept only for reading; the pinned PyPI wheel is what runs
+third_party/stable-worldmodel/

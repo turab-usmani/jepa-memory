@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jmem"
+version = "0.0.1"
+description = "Memory for JEPA world models under partial observability (LeWM / stable-worldmodel)"
+readme = "README.md"
+requires-python = ">=3.10"
+# Core deps are deliberately light so `pytest -m "not slow"` runs anywhere.
+# torch is range-pinned (not ==) so Colab keeps its preinstalled CUDA build;
+# the exact resolved versions are written next to every result
+# (jmem.utils.env_versions) and frozen by notebook 00 into
+# <drive>/jmem/locks/pip-freeze-<date>.txt.
+dependencies = [
+    "torch>=2.4,<3",
+    "numpy>=1.26,<3",
+    "pyyaml>=6.0,<7",
+    "jsonschema>=4.20,<5",
+]
+
+[project.optional-dependencies]
+# Everything needed to run LeWM training / planning (GPU runtime).
+# Versions verified against the sources read in NOTES.md.
+#
+# `wm` covers the 2-D environments (TwoRoom, PushT) without the heavy / fragile
+# `stable-worldmodel[env]` extra (gymnasium[all] -> box2d, mujoco-py, ale; craftax -> jax).
+# `wm-all` adds that extra for the MuJoCo environments (Reacher, OGBench-Cube).
+wm = [
+    "stable-worldmodel[train,format]==0.1.1",
+    "stable-pretraining==0.1.8",
+    "pygame>=2.5,<3",
+    "pymunk>=6.6,<8",
+    "shapely>=2.0,<3",
+    "opencv-python-headless>=4.8,<6",
+    "hydra-core>=1.3.2,<1.4",
+    "omegaconf>=2.3,<2.4",
+    "lightning>=2.4,<3",
+    "transformers>=4.50,<5",  # 5.x renames the HF ViT parameters: released weights fail to load
+    "datasets>=2.20,<5.1",       # newest release that still works with huggingface_hub<1,
+    "scikit-learn>=1.7,<2",
+    "h5py>=3.10,<4",
+    "hdf5plugin>=4.4,<8",
+    "zstandard>=0.22,<1",
+    "huggingface_hub>=0.23,<1",  # required by transformers 4.x,
+    "einops>=0.7,<1",
+]
+wm-all = [
+    "jmem[wm]",
+    "swig>=4,<5",  # build dependency of box2d-py (pulled in by gymnasium[all])
+    "stable-worldmodel[train,env,format]==0.1.1",
+]
+dev = [
+    "pytest>=8,<10",
+    "nbformat>=5.9,<6",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: takes more than 60 s or needs a GPU / datasets (deselect with -m 'not slow')",
+]
+addopts = "-ra"
