@@ -228,6 +228,42 @@ only scores the last imagined step; expect a drop for reasons unrelated to memor
   `WorldModelPolicy`, so that loop must first be shown to reproduce the official
   number when restricted to 1 frame (regression test + notebook 01 check).
 
+- **D10 (2026-11-16, agent default, not yet confirmed — Q3)** Evaluation seeds
+  are `[42, 43, 44]`. The seed picks the evaluation episodes and seeds CEM, so
+  the three seeds are three different 50-episode sets from the same checkpoint.
+  They measure evaluation variance, **not** training variance (one released
+  checkpoint per env).
+- **D11** Two intervals are always reported and labelled (`jmem.aggregate`):
+  a 95% Student-t interval across seeds, and a 95% Wilson interval on the pooled
+  episodes. With 3 seeds the t quantile is 4.303, so the seed interval is wide.
+- **D12** Reference values for the ±5 check live in `configs/eval/references.yaml`.
+  Only TwoRoom (87, from the brief) is filled in; PushT / Reacher / Cube stay
+  `TODO(reference)` until the human supplies the LeWM paper's table values.
+
+### Phase 1 findings about the official training script (2026-11-16)
+
+Found by running `le-wm/train.py` unchanged through `jmem._official_train_runner`
+on a 4-episode synthetic TwoRoom dataset (CPU, 12 optimisation steps):
+- **Cost pre-estimate (to be replaced by the notebook-01 probe).** TwoRoom has
+  920,809 − 10,000 × 19 = 730,809 clips; 90 % / batch 128 = **5,138 steps per
+  epoch**, so the official 100 epochs are **513,800 steps**. One run costs
+  142.7 × (seconds per step) L4-hours: 0.1 s/step → 14 h, 0.3 s/step → 43 h.
+  The step time on an L4 is unknown until the probe runs, but a 100-epoch run is
+  very unlikely to be "a few hours", and 8–10 perturbed runs plus the P2 grid
+  cannot all be 100-epoch runs inside 150 L4-h.
+- **No auto-resume as shipped.** `train.py:132-138` resumes only if
+  `<run_dir>/<name>_weights.ckpt` exists, and nothing in the dry run wrote that
+  file (only `weights_epoch_N.pt` state dicts via `SaveCkptCallback`). A long
+  run therefore needs our own resumable checkpointing (brief 6.5).
+- **One `.pt` per epoch.** `load_pretrained(<run>)` raises "Ambiguous checkpoint"
+  when a folder holds several `.pt` files (`swm/wm/utils.py:132-136`); evaluate
+  from-scratch runs with `policy=<run>/weights_epoch_<N>.pt`.
+- From-scratch checkpoints carry `_target_: jepa.JEPA`, so loading them needs
+  `third_party/le-wm` on `sys.path` (the eval runner already does this) and uses
+  the le-wm class, not swm's `LeWM` (see 2.6 for the differences).
+- `stable_pretraining.Manager` uses Unix-only signals: training cannot run on
+  Windows. The local dry run used a throw-away signal shim.
+
 ## 4. Open questions (need the human's decision)
 
 - **Q1 — RESOLVED by D9 (option b).** Original question: what does the baseline see at plan time? (from 2.4) Under the official
