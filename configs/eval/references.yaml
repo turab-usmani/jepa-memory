@@ -1,0 +1,26 @@
+# Reference success rates (percent) for the reproduction check (Gate A: within ±5).
+#
+# Only values with a stated source are filled in. `null` means "not yet verified
+# against the source document" and yields a TODO(reference) verdict, never a guess.
+tolerance: 5.0
+
+references:
+  swm/TwoRoom-v1:
+    value: 87.0
+    source: "project brief §1.1: 'only the config protocol reproduces the reported ~87%' (via arXiv 2608.10145)"
+  swm/PushT-v1:
+    value: null
+    source: "LeWM paper (arXiv 2603.19312) main results table — to be supplied by the human"
+  swm/ReacherDMControl-v0:
+    value: null
+    source: "LeWM paper — to be supplied by the human"
+  swm/OGBCube-v0:
+    value: null
+    source: "LeWM paper — to be supplied by the human"
+
+# Sanity ranges only (NOT targets), copied from the project brief §1 (Sub-JEPA, arXiv 2605.09241).
+sanity_ranges:
+  swm/TwoRoom-v1: "84.33 ± 4.23"
+  swm/ReacherDMControl-v0: "82.67 ± 4.42"
+  swm/PushT-v1: "84.67 ± 6.53"
+  swm/OGBCube-v0: "67.33 ± 5.01"

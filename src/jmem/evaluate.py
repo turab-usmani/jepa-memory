@@ -178,3 +178,131 @@ def check_protocol(
         if want != got:
             mismatches.append(f"{name}: protocol={want!r} runtime={got!r}")
     return mismatches
+
+
+# --------------------------------------------------------------------------- #
+# Results JSON (one file per run x env x perturbation x eval seed)
+# --------------------------------------------------------------------------- #
+
+_NUM_OR_NULL = {"type": ["number", "null"]}
+_FRACTION = {"type": "number", "minimum": 0.0, "maximum": 1.0}
+
+RESULT_SCHEMA: dict[str, Any] = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": [
+        "run_id", "git_sha", "env", "perturbation", "predictor", "params_predictor",
+        "train_seed", "eval_seed", "protocol", "success", "n_episodes", "rollout_mse",
+        "probe_r2", "latency_ms_median", "hardware", "wallclock_s", "timestamp",
+    ],
+    "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "git_sha": {"type": "string"},
+        "env": {"type": "string"},
+        "perturbation": {
+            "type": "object", "required": ["name"],
+            "properties": {"name": {"type": "string"}},
+        },
+        "predictor": {"type": "string"},
+        "params_predictor": {"type": "integer", "minimum": 0},
+        # null = released checkpoint (training seed unknown)
+        "train_seed": {"type": ["integer", "null"]},
+        "eval_seed": {"type": "integer"},
+        "protocol": {"type": "object"},
+        # keys are goal offsets in env steps; values are success FRACTIONS in [0, 1]
+        "success": {
+            "type": "object", "minProperties": 1,
+            "propertyNames": {"pattern": "^[0-9]+$"},
+            "additionalProperties": _FRACTION,
+        },
+        "n_episodes": {"type": "integer", "minimum": 1},
+        "episode_successes": {
+            "type": "object",
+            "additionalProperties": {"type": "array", "items": {"type": "boolean"}},
+        },
+        # null = not measured in this run (never 0.0 as a placeholder)
+        "rollout_mse": {"type": ["object", "null"], "additionalProperties": _NUM_OR_NULL},
+        "probe_r2": {"type": ["object", "null"]},
+        "latency_ms_median": _NUM_OR_NULL,
+        "hardware": {"type": "string"},
+        "wallclock_s": {"type": "number", "minimum": 0},
+        "timestamp": {"type": "string"},
+        # which frames the planner received: "official_1frame" or "stream" (NOTES D9)
+        "context": {"type": "string"},
+        "versions": {"type": "object"},
+    },
+}
+
+
+def success_rate(episode_successes: Sequence[bool]) -> float:
+    """Fraction of successful episodes, in [0, 1]."""
+    eps = [bool(x) for x in episode_successes]
+    if not eps:
+        raise ValueError("no episodes")
+    return sum(eps) / len(eps)
+
+
+def validate_result(result: dict[str, Any]) -> None:
+    """Raise ``jsonschema.ValidationError`` / ``ValueError`` if ``result`` is malformed."""
+    import math
+
+    import jsonschema
+
+    jsonschema.validate(result, RESULT_SCHEMA)
+    for off, eps in (result.get("episode_successes") or {}).items():
+        if len(eps) != result["n_episodes"]:
+            raise ValueError(f"offset {off}: {len(eps)} episodes, expected {result['n_episodes']}")
+        if not math.isclose(success_rate(eps), result["success"][off], abs_tol=1e-9):
+            raise ValueError(f"offset {off}: success does not match episode_successes")
+
+
+def official_record_to_result(record: dict[str, Any], protocol: dict[str, Any]) -> dict[str, Any]:
+    """Convert a record from :func:`run_official_eval` into the results-JSON schema.
+
+    Only planning success is filled in; rollout error, probes and latency are
+    ``None`` because the official script does not measure them.
+    """
+    env = record["env"]
+    offset = str(record["evaluate_kwargs"]["goal_offset"])
+    eps = [bool(x) for x in record["metrics"]["episode_successes"]]
+    model = record["policy"].get("model") or {}
+    frames = model.get("predictor_num_frames")
+    result = {
+        "run_id": f"official-{env}-released-s{record['seed']}",
+        "git_sha": record["git_sha"],
+        "env": protocol["envs"][env]["env_name"],
+        "perturbation": {"name": "none"},
+        "predictor": f"transformer_h{frames}" if frames else record["policy"]["type"],
+        "params_predictor": int(model.get("n_params_predictor") or 0),
+        "train_seed": None,
+        "eval_seed": int(record["seed"]),
+        "protocol": {
+            "common": protocol["common"],
+            "env": protocol["envs"][env],
+            "source": protocol["source"],
+            "mismatches": check_protocol(record, protocol, env),
+        },
+        "success": {offset: success_rate(eps)},
+        "n_episodes": len(eps),
+        "episode_successes": {offset: eps},
+        "rollout_mse": None,
+        "probe_r2": None,
+        "latency_ms_median": None,
+        "hardware": record["hardware"],
+        "wallclock_s": float(record["wallclock_s"]),
+        "timestamp": record["timestamp"],
+        "context": "official_1frame",
+        "versions": record.get("versions", {}),
+    }
+    validate_result(result)
+    return result
+
+
+def write_result(result: dict[str, Any], out_dir: Path | str) -> Path:
+    """Validate and write ``<out_dir>/<run_id>.json``."""
+    validate_result(result)
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    path = out_dir / f"{result['run_id']}.json"
+    path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    return path
