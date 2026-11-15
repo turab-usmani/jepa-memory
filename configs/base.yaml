@@ -1,0 +1,56 @@
+# LeWM training defaults, mirrored from the code that runs.
+# Source: le-wm @ 8edfeb3 (third_party/le-wm). "L<n>" = line in the named file.
+# tests/test_protocol.py::test_base_matches_lewm_train_config keeps this in sync.
+
+source:
+  le_wm_commit: 8edfeb336732b5f3ce7b8b210d0ba370a09e2cac
+  train_config: third_party/le-wm/config/train/lewm.yaml
+  model_config: third_party/le-wm/config/train/model/lewm.yaml
+
+train:
+  seed: 3072                 # lewm.yaml L12
+  train_split: 0.9           # lewm.yaml L11
+  img_size: 224              # lewm.yaml L13
+  embed_dim: 192             # lewm.yaml L14
+  history_size: 3            # lewm.yaml L15  (paper appendix says 1)
+  num_preds: 1               # lewm.yaml L36
+  max_epochs: 100            # lewm.yaml L18  (paper appendix says 10)
+  precision: bf16            # lewm.yaml L21
+  gradient_clip_val: 1.0     # lewm.yaml L22
+  batch_size: 128            # lewm.yaml L25
+  num_workers: 6             # lewm.yaml L10
+  optimizer:
+    type: AdamW              # lewm.yaml L32
+    lr: 5.0e-5               # lewm.yaml L33
+    weight_decay: 1.0e-3     # lewm.yaml L34
+  scheduler: LinearWarmupCosineAnnealingLR   # train.py L91, stepped per epoch (L92)
+  sigreg:
+    weight: 0.09             # lewm.yaml L40  (paper says 0.1)
+    knots: 17                # lewm.yaml L42
+    num_proj: 1024           # lewm.yaml L43
+
+data:
+  frameskip: 5               # data/*.yaml L3-4
+  num_steps: 4               # data/*.yaml: num_preds + history_size
+
+model:
+  encoder:                   # model/lewm.yaml L3-9: HF ViT-tiny, CLS token (jepa.py L38)
+    size: tiny
+    patch_size: 14
+    pretrained: false
+  predictor:                 # model/lewm.yaml L11-22: module.ARPredictor
+    depth: 6
+    heads: 16
+    dim_head: 64
+    mlp_dim: 2048
+    dropout: 0.1
+    emb_dropout: 0.0
+  projector_hidden_dim: 2048   # model/lewm.yaml L33, BatchNorm1d MLP
+  pred_proj_hidden_dim: 2048   # model/lewm.yaml L42, BatchNorm1d MLP
+
+# Conventions that appear in NO config file (see NOTES.md section 2.3):
+undocumented_conventions:
+  dense_action_gathering: "actions are NOT strided by frameskip; each step's action is the 5 raw actions concatenated (swm data/formats/hdf5.py:121-122, data/dataset.py:70-71)"
+  action_encoder_width: "input_dim = frameskip * action_dim, set in code (train.py:68)"
+  imagenet_normalisation: "mean/std from stable_pretraining.data.dataset_stats.ImageNet (utils.py:6-10)"
+  action_zscore_nan_dropped: "per-column z-score, rows containing NaN excluded from the statistics (utils.py:25-32); NaN actions then set to 0 after scaling (train.py:25)"

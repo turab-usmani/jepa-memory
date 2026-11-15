@@ -1,0 +1,121 @@
+# THE evaluation protocol.
+#
+# Every value below is copied from code that runs, not from the LeWM paper.
+# Sources (pinned): le-wm @ 8edfeb3, stable-worldmodel 0.1.1 (tag 15a5538).
+# tests/test_protocol.py asserts this file equals the le-wm YAML configs and the
+# swm defaults; jmem.evaluate.check_protocol asserts it equals what a run
+# actually used at runtime.
+
+source:
+  le_wm_commit: 8edfeb336732b5f3ce7b8b210d0ba370a09e2cac
+  stable_worldmodel_version: 0.1.1
+  entrypoint: third_party/le-wm/eval.py
+
+common:
+  num_eval: 50                 # config/eval/<env>.yaml  eval.num_eval
+  goal_offset_steps: 25        # config/eval/<env>.yaml  eval.goal_offset_steps  (env steps)
+  eval_budget: 50              # config/eval/<env>.yaml  eval.eval_budget        (env steps)
+  max_episode_steps: 100       # eval.py:57  = 2 * eval_budget
+  img_size: 224                # config/eval/<env>.yaml  eval.img_size
+  world_image_shape: [224, 224]  # eval.py:58
+  seed: 42                     # config/eval/<env>.yaml  seed (episode sampling + CEM noise)
+
+  # MPC loop: swm.PlanConfig (stable_worldmodel/policy.py:17-38)
+  plan:
+    horizon: 5                 # predictor steps; x action_block = 25 env steps
+    receding_horizon: 5        # executes the whole plan -> replans every 25 env steps
+    action_block: 5            # frameskip: one planned action = 5 env actions
+    history_len: 1             # dataclass default; NEVER READ anywhere in swm 0.1.1
+    warm_start: true           # dataclass default (no effect: receding_horizon == horizon)
+
+  # config/eval/solver/cem.yaml -> stable_worldmodel/solver/cem.py:17
+  solver:
+    target: stable_worldmodel.solver.CEMSolver
+    num_samples: 300
+    n_steps: 30
+    topk: 30
+    var_scale: 1.0
+    batch_size: 1
+
+  # Number of real observation frames in the planner's context. EnvPool always
+  # stacks infos as (num_envs, 1, ...) (world/env_pool.py:162-182) and nothing
+  # accumulates history, so LeWM.rollout starts from ONE encoded frame and fills
+  # the rest of its 3-frame window with its own predictions (wm/lewm/lewm.py:69-100).
+  context_frames_at_plan_time: 1
+  planner_calls_per_episode: 2   # eval_budget / (receding_horizon * action_block)
+
+  # Goal construction (stable_worldmodel/world/world.py:492-598)
+  goal_construction:
+    start: "dataset row (episode e, step s), sampled as below; env reset then forced to that row's state via `callables`"
+    goal_image: "dataset `pixels` frame of the SAME episode at step s + goal_offset_steps (world.py:570-596)"
+    goal_state: "same row's columns, exposed as goal_<col>, pushed into the env via `callables`"
+    goal_fixed: "goal keys are re-written into infos after every env step (world.py:532, 542)"
+    success: "any step with terminated=True within eval_budget (world.py:543); success_rate in percent"
+    preprocessing: "pixels and goal: ToImage -> float32 [0,1] -> ImageNet Normalize -> Resize(224) (eval.py:17-26)"
+    action_scaling: "sklearn StandardScaler fit on dataset actions with NaN rows dropped; planner works in z-scored space (eval.py:71-79, policy.py:436-437)"
+
+  # Episode selection (le-wm/eval.py:108-134)
+  episode_selection:
+    valid_rows: "rows with step_idx <= episode_len - goal_offset_steps - 1"
+    sampler: "np.random.default_rng(seed).choice(len(valid_rows) - 1, size=num_eval, replace=False), then sorted"
+    one_env_per_episode: true    # world.num_envs == num_eval (world.py:504)
+
+# jmem extension (NOT part of the official protocol): the brief asks for 3
+# evaluation seeds. 42 is the official one. Pending confirmation, see NOTES.md.
+eval_seeds: [42, 43, 44]
+
+envs:
+  tworoom:
+    env_name: swm/TwoRoom-v1
+    dataset_name: tworoom
+    checkpoint: quentinll/lewm-tworooms
+    keys_to_cache: [action, proprio]
+    world_kwargs: {}
+    callables:
+      - method: _set_state
+        args: {state: {value: proprio}}
+      - method: _set_goal_state
+        args: {goal_state: {value: goal_proprio}}
+  pusht:
+    env_name: swm/PushT-v1
+    dataset_name: pusht_expert_train
+    checkpoint: quentinll/lewm-pusht
+    keys_to_cache: [action, proprio, state]
+    world_kwargs: {}
+    callables:
+      - method: _set_state
+        args: {state: {value: state}}
+      - method: _set_goal_state
+        args: {goal_state: {value: goal_state}}
+  reacher:
+    env_name: swm/ReacherDMControl-v0
+    dataset_name: dmc/reacher_random
+    checkpoint: quentinll/lewm-reacher
+    keys_to_cache: [action]
+    world_kwargs: {task: qpos_match}
+    callables:
+      - method: set_state
+        args: {qpos: {value: qpos}, qvel: {value: qvel}}
+      - method: set_target_qpos
+        args: {target_qpos: {value: goal_qpos}}
+  cube:
+    env_name: swm/OGBCube-v0
+    dataset_name: ogbench/cube_single_expert
+    checkpoint: quentinll/lewm-cube
+    keys_to_cache: [action]
+    world_kwargs:
+      env_type: single
+      ob_type: states
+      multiview: false
+      width: 224
+      height: 224
+      visualize_info: false
+      terminate_at_goal: true
+    callables:
+      - method: set_state
+        args: {qpos: {value: qpos}, qvel: {value: qvel}}
+      - method: set_target_pos
+        args:
+          cube_id: {value: 0, in_dataset: false}
+          target_pos: {value: goal_privileged_block_0_pos}
+          target_quat: {value: goal_privileged_block_0_quat}
