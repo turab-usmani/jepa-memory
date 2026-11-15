@@ -219,9 +219,18 @@ only scores the last imagined step; expect a drop for reasons unrelated to memor
 - **D8** Goal image is never perturbed (brief 5.2) — to be implemented in Phase 1;
   recorded here as required by the brief.
 
+- **D9 (2026-11-16, decided by the human; resolves Q1)** At plan time **every
+  predictor variant receives the same stream of real frames**: `transformer_h{H}`
+  keeps a FIFO of the last H real latents, recurrent variants update their state
+  on each real frame. The official 1-frame protocol is kept only as a separate
+  reproduction row (released checkpoint, `le-wm/eval.py` unchanged). Consequence:
+  P1/P2 numbers come from our own planning loop (`jmem.plan`), not from swm's
+  `WorldModelPolicy`, so that loop must first be shown to reproduce the official
+  number when restricted to 1 frame (regression test + notebook 01 check).
+
 ## 4. Open questions (need the human's decision)
 
-- **Q1 — what does the baseline see at plan time?** (from 2.4) Under the official
+- **Q1 — RESOLVED by D9 (option b).** Original question: what does the baseline see at plan time? (from 2.4) Under the official
   protocol no predictor receives observation history, so a perturbed current
   frame is all the planner has, and a recurrent predictor could not help either
   unless the policy feeds it every frame. Options:
