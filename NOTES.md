@@ -257,6 +257,15 @@ only scores the last imagined step; expect a drop for reasons unrelated to memor
 
 ## 5. Log
 
+- 2026-11-16 Notebook 00 ran on Colab (L4, commit 1bc651a, 0.1046 h): all cells
+  passed, no protocol mismatches. Confirms 2.4 at runtime (pixels shape
+  `[2, 1, 224, 224, 3]`). Resolves two "unverified" items in 2.8: the released
+  files do carry an episode-index column (`ep_idx` in TwoRoom, `episode_idx` in
+  PushT), and TwoRoom has both `proprio` and `pos_agent`, so le-wm's callables
+  work as written. The episode-length loop in `eval.py:29-37` is not a problem
+  (total wall-clock 33 s TwoRoom, 52 s PushT for 2 episodes, model load included).
+  Colab runs Python 3.13.16 / torch 2.14.1+cu130; the transformers downgrade to
+  4.57.6 installed cleanly. Gate 0 criteria met; see `reports/CHECKPOINT_0.md`.
 - 2026-11-16 Local verification (Windows, Python 3.13, CPU, torch 2.15): fast
   tests pass with and without the LeWM stack; released TwoRoom weights load and
   `get_cost` runs from a single frame; the unmodified `eval.py` runs end-to-end

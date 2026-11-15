@@ -1,59 +1,56 @@
 # CHECKPOINT 0 — after Phase 0 (setup and smoke test)
 
-Date: 2026-11-16. Status: **WAITING FOR THE COLAB RUN** (not passed yet).
+Report date: 2026-11-16. Status: **criteria met; waiting for the human's decision to start Phase 1.**
 
 ## Results table
 
-No experimental results exist yet.
+Source: the "NB00 SUMMARY" block pasted by the human from the Colab run of
+`notebooks/00_setup_and_smoke.ipynb` at commit `1bc651a` (NVIDIA L4). The
+underlying JSON records are on Drive under `jmem/results/smoke/` and are **not
+yet copied into the repo's `results/`**.
 
-| Env | Protocol | Success (%) | Source JSON |
-|---|---|---|---|
-| TwoRoom | official, released ckpt, 2 episodes (smoke) | TODO(result) | `results/smoke/official_tworoom_n2_s42.json` |
-| PushT | official, released ckpt, 2 episodes (smoke) | TODO(result) | `results/smoke/official_pusht_n2_s42.json` |
+| Env | Protocol | Episodes | Success (%) | Protocol mismatches | Eval wall-clock (s) | Record |
+|---|---|---|---|---|---|---|
+| TwoRoom | official `eval.py`, released ckpt | 2 | 100.0 | none | 4.7 | `results/smoke/official_tworoom_n2_s42.json` |
+| PushT | official `eval.py`, released ckpt | 2 | 100.0 | none | 3.1 | `results/smoke/official_pusht_n2_s42.json` |
 
-(Two-episode smoke numbers prove the pipeline runs; they are not success estimates.)
+These are **pipeline checks, not success estimates**: two episodes carry no
+statistical information and must not be quoted as reproduction results.
 
 ## Compute used versus budget
 
-0.0 / 150 L4-hours (ledger is empty; all work so far was local CPU).
-Notebook 00 estimate: ≤ 0.5 L4-h.
+0.105 / 150 L4-hours (0.07 %). Notebook 00 was estimated at 0.5 L4-h and took
+0.1046 h (ledger row `nb00-smoke`), including both dataset downloads.
 
 ## Verdict per criterion
 
 | Gate 0 criterion | Verdict | Evidence |
 |---|---|---|
+| Notebook 00 passes on a fresh Colab runtime | PASS | all cells ran; `tests_ok: True`; validation asserts passed; summary pasted back |
 | `NOTES.md` explains LeWM with file:line refs | PASS | `NOTES.md` §1–2 |
-| Notebook 00 passes on a fresh Colab runtime | **PENDING** | not executed on Colab; needs the human |
 
-What was verified locally (Windows, Python 3.13, CPU):
-- `pytest -m "not slow"`: 49 passed with the LeWM stack installed, 35 passed + 5
-  skipped without it; < 1 min.
-- Released TwoRoom weights load with the pinned stack and `get_cost` runs.
-- The unmodified `le-wm/eval.py` runs end-to-end through our capture runner
-  (`policy=random`, synthetic 4-episode TwoRoom dataset).
-- All notebook code cells parse.
-
-What was NOT verified: the CUDA policy path, the real datasets (archive layout,
-column names), Colab's preinstalled packages, PushT, wall-clock times.
+Facts confirmed by the run:
+- The planner sees one real frame: `info_pixels_shape = [2, 1, 224, 224, 3]` on both envs.
+- Runtime plan / solver settings equal `configs/eval/protocol.yaml` (no mismatches).
+- Model sizes match the local measurement: 18,034,478 total, 10,791,360 predictor.
+- Datasets: TwoRoom 10,000 episodes / 920,809 steps (length 31–101, column `ep_idx`);
+  PushT 18,685 episodes / 2,336,736 steps (length 49–246, column `episode_idx`).
+- Colab stack: Python 3.13.16, torch 2.14.1+cu130, transformers 4.57.6 (downgrade worked).
 
 ## Risks
 
-1. **Install on Colab.** `transformers` must be downgraded below 5 (released
-   weights do not load otherwise), which drags `huggingface_hub<1` and
-   `datasets<5.1`. pip may ask for a runtime restart or report conflicts with
-   unrelated preinstalled packages.
-2. **Dataset layout.** `tworoom.tar.zst` is assumed to contain exactly one `.h5`;
-   the code raises a clear error listing the archive contents otherwise.
-3. **Episode-index column.** `eval.py` needs `ep_idx` or `episode_idx` in the HDF5.
-4. **Disk.** PushT is 13.1 GB compressed; uncompressed size unknown.
-5. **Scientific (see NOTES §2.4–2.5, §4):** the official planner sees one real
-   frame and makes two decisions per episode. The POMDP benchmark and the
-   baseline definition depend on Q1–Q4, which need a decision before Phase 1.
+1. Smoke JSONs live only on Drive; results used in any table must be copied into
+   the repo's `results/` (notebook 01 will do this explicitly).
+2. `wm-all` (Reacher, Cube) is still untested; those datasets are 23.8 GB and 46.2 GB.
+3. Scientific: with D9 decided, P1/P2 use our own planning loop. It must first
+   reproduce the official number in 1-frame mode. Q2–Q4 (`NOTES.md` §4) are open.
+4. Per-episode evaluation is cheap (about 2 s per episode here), so evaluation
+   will not be the budget bottleneck; training cost is still unmeasured.
 
 ## Recommended next step
 
-1. Human: push the repo, run `notebooks/00_setup_and_smoke.ipynb` on an L4, paste
-   back the "NB00 SUMMARY" block (or the first failing cell's output).
-2. Human: answer Q1–Q4 in `NOTES.md` §4.
-3. Agent: fix whatever notebook 00 reveals; after Gate 0 passes, start Phase 1
-   (5.1 reproduction: 50 episodes × 3 seeds on TwoRoom and PushT).
+Start Phase 1, step 5.1 (reproduction), after the human approves and answers Q2–Q4:
+released checkpoints, official protocol, 50 episodes × 3 eval seeds on TwoRoom and
+PushT. Extrapolating from the smoke run (assumes linear scaling in episodes,
+unverified): well under 0.5 L4-h in total. The from-scratch TwoRoom training run
+that measures L4-hours per run would follow, with its own estimate first.
