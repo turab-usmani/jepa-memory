@@ -150,7 +150,8 @@ def check_protocol(
         ("eval_budget", common["eval_budget"], kwargs.get("eval_budget")),
         ("num_eval", common["num_eval"], record.get("num_envs")),
         ("num_eval", common["num_eval"], len(kwargs.get("episodes_idx") or [])),
-        ("seed", common["seed"], hcfg.get("seed")),
+        # the seed the script resolved must be the one that was requested ...
+        ("seed", record.get("seed", common["seed"]), hcfg.get("seed")),
         ("img_size", common["img_size"], (hcfg.get("eval") or {}).get("img_size")),
         ("max_episode_steps", common["max_episode_steps"], record.get("max_episode_steps")),
         ("callables", spec["callables"], kwargs.get("callables")),
@@ -172,6 +173,11 @@ def check_protocol(
         checks.append((f"solver.{key}", want, got))
 
     mismatches = []
+    # ... and must be one of the protocol's evaluation seeds (42 is the official one;
+    # the others are the jmem extension, NOTES D10)
+    allowed = protocol.get("eval_seeds") or [common["seed"]]
+    if "seed" not in ignore and hcfg.get("seed") not in allowed:
+        mismatches.append(f"seed: protocol eval_seeds={allowed!r} runtime={hcfg.get('seed')!r}")
     for name, want, got in checks:
         if name.split(".")[0] in ignore or name in ignore:
             continue

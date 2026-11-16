@@ -267,6 +267,25 @@ def test_check_protocol_flags_goal_and_history_changes(protocol):
     assert any(m.startswith("context_frames_at_plan_time") for m in bad)
 
 
+def test_check_protocol_seeds(protocol):
+    """Regression (notebook 01): the extra eval seeds are part of the protocol."""
+    for seed in protocol["eval_seeds"]:
+        rec = _record(protocol, "tworoom")
+        rec["seed"] = seed
+        rec["hydra_config"]["seed"] = seed
+        assert check_protocol(rec, protocol, "tworoom") == []
+    rec = _record(protocol, "tworoom")
+    rec["seed"] = 7
+    rec["hydra_config"]["seed"] = 7  # requested and used, but not a protocol seed
+    assert check_protocol(rec, protocol, "tworoom") == [
+        f"seed: protocol eval_seeds={protocol['eval_seeds']!r} runtime=7"
+    ]
+    rec = _record(protocol, "tworoom")
+    rec["seed"] = 43  # requested 43 but the script ran with 42
+    bad = check_protocol(rec, protocol, "tworoom")
+    assert bad == ["seed: protocol=43 runtime=42"]
+
+
 def test_check_protocol_ignore(protocol):
     rec = _record(protocol, "tworoom")
     rec["num_envs"] = 2
