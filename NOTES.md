@@ -264,7 +264,50 @@ on a 4-episode synthetic TwoRoom dataset (CPU, 12 optimisation steps):
 - `stable_pretraining.Manager` uses Unix-only signals: training cannot run on
   Windows. The local dry run used a throw-away signal shim.
 
+### Notebook 01 results (2026-11-16, L4, commit cac811e)
+
+Source: the "NB01 SUMMARY" block pasted by the human. The results JSON files are
+in `reproduction_results.zip` on Drive and are **not yet committed** to
+`results/reproduction/`; until they are, README keeps `TODO(result)`.
+
+- Reproduction, released checkpoints, official protocol, 50 episodes × seeds
+  42/43/44, no protocol mismatches:
+  - TwoRoom 85.3 ± 2.9 (t-CI over seeds), Wilson [78.8, 90.1], per seed 86/84/86
+    (43, 42, 43 of 50). Reference 87 → Δ −1.7 → **within ±5**.
+  - PushT 89.3 ± 5.7, Wilson [83.4, 93.3], per seed 92/88/88 (46, 44, 44 of 50).
+    No verified reference value yet (`TODO(reference)`).
+- Training throughput probe (official `train.py`, 300 steps, batch 128, bf16,
+  6 workers, 12 CPU cores): **median 0.601 s/step** (240 intervals, max 0.625).
+  With 5,138 steps/epoch: 0.86 L4-h per epoch, **85.8 L4-h for the official 100
+  epochs, 8.6 L4-h for 10 epochs** (lower bounds: no validation, no checkpoint
+  writes). Not yet known whether the step is GPU-bound or dataloader-bound.
+- Compute used so far: 0.165 / 150 L4-h.
+
+**Budget consequence.** One official from-scratch run is 57 % of the whole
+budget. The brief's plan (one from-scratch run + 8–10 perturbed LeWM runs in P1 +
+a P2 grid of 4 envs × 3–4 conditions × 5–6 predictors × 3 seeds) is not
+feasible end-to-end at any epoch count close to the official one. Needs a
+decision — Q6 below.
+
 ## 4. Open questions (need the human's decision)
+
+- **Q6 — how do we train within 150 L4-h?** (from the probe above)
+  (a) *Frozen released encoder, train predictors on cached latents.* Encode each
+      dataset once with the released encoder (inference only), then train every
+      predictor variant on 192-d latents: minutes per run instead of days, so the
+      full grid with 3 seeds fits. Keeps "identical encoder across variants"
+      exactly. Cost: not end-to-end; the encoder never adapts to perturbed
+      frames; claims must be scoped to "predictor memory on top of a fixed LeWM
+      encoder".
+  (b) *End-to-end only, heavily cut.* E.g. ≤ 2 epochs per run (1.7 L4-h) and a
+      much smaller grid. Faithful to LeWM training but under-trained, few runs,
+      weak statistics.
+  (c) *Hybrid (recommended).* (a) for the full grid, plus a small number of
+      end-to-end confirmation runs (10-epoch, ~8.6 L4-h each) on the most
+      informative condition to check that the frozen-encoder conclusion survives.
+  The from-scratch TwoRoom reproduction run (brief 5.1) at the official 100
+  epochs should not be launched under any option; a 10-epoch version is the most
+  we can afford, and only if you want it.
 
 - **Q1 — RESOLVED by D9 (option b).** Original question: what does the baseline see at plan time? (from 2.4) Under the official
   protocol no predictor receives observation history, so a perturbed current
