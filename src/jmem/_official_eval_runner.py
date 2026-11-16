@@ -82,7 +82,35 @@ def main() -> None:
 
     original = swm.World.evaluate
 
+    mode = os.environ.get("JMEM_EVAL_MODE", "plan")
+
+    class ReplayPolicy(swm.policy.BasePolicy):
+        """Open-loop replay of dataset actions (diagnostic; see run_official_eval)."""
+
+        def __init__(self, actions: Any) -> None:
+            super().__init__()
+            self.type = "replay"
+            self.actions = actions  # (n_envs, n_steps, action_dim), raw action units
+            self.t = 0
+
+        def get_action(self, info_dict: Any, **kw: Any) -> Any:
+            a = self.actions[:, min(self.t, self.actions.shape[1] - 1)]
+            self.t += 1
+            return a.reshape(self.env.action_space.shape).copy()
+
     def evaluate(self, *args: Any, **kwargs: Any) -> dict:
+        if mode == "replay":
+            from jmem.evaluate import build_replay_actions
+
+            ds = kwargs["dataset"]
+            n_steps = int(kwargs["goal_offset"])
+            actions = build_replay_actions(
+                ds.get_col_data("action"), ds.offsets, ds.lengths,
+                kwargs["episodes_idx"], kwargs["start_steps"], n_steps,
+            )
+            self.set_policy(ReplayPolicy(actions))
+            # stop exactly when the dataset trajectory reaches the goal row; no video
+            kwargs = {**kwargs, "eval_budget": n_steps, "video": None}
         t0 = time.perf_counter()
         metrics = original(self, *args, **kwargs)
         wall = time.perf_counter() - t0
@@ -104,6 +132,7 @@ def main() -> None:
             "policy": _describe_policy(self.policy),
             "metrics": _to_jsonable(metrics),
             "evaluate_wallclock_s": wall,
+            "mode": mode,
         }
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(record, f, indent=2)

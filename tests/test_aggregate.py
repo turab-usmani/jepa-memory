@@ -79,6 +79,15 @@ def test_load_results_validates(tmp_path):
         aggregate.load_results(tmp_path)
 
 
+def test_crosstab():
+    ct = aggregate.crosstab([1, 1, 0, 0, 1], [1, 0, 1, 0, 1])
+    assert ct == {"n": 5, "plan_ok_replay_ok": 2, "plan_ok_replay_fail": 1,
+                  "plan_fail_replay_ok": 1, "plan_fail_replay_fail": 1}
+    assert sum(v for k, v in ct.items() if k != "n") == ct["n"]
+    with pytest.raises(ValueError):
+        aggregate.crosstab([True], [True, False])
+
+
 def test_replace_block():
     text = "a\n<!-- BEGIN:t -->\nold\n<!-- END:t -->\nb\n"
     out = aggregate.replace_block(text, "t", "new 1\nnew 2\n")

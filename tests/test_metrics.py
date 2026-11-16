@@ -99,3 +99,24 @@ def test_schema_rejects_bad_results(tmp_path):
     bad["n_episodes"] = 3
     with pytest.raises(ValueError):
         validate_result(bad)
+
+
+def test_build_replay_actions():
+    import numpy as np
+
+    from jmem.evaluate import build_replay_actions
+
+    # two episodes: lengths 4 and 3; the last row of each episode is NaN (swm convention)
+    col = np.arange(14, dtype=np.float64).reshape(7, 2)
+    col[3] = np.nan
+    col[6] = np.nan
+    offsets, lengths = np.array([0, 4]), np.array([4, 3])
+    out = build_replay_actions(col, offsets, lengths, [0, 1], [1, 0], n_steps=4)
+    assert out.shape == (2, 4, 2) and out.dtype == np.float32
+    # env 0: rows 1, 2, then the NaN row -> repeat row 2, then past the end -> repeat
+    assert out[0].tolist() == [[2, 3], [4, 5], [4, 5], [4, 5]]
+    # env 1: flat rows 4, 5, then NaN / past the end; never crosses into another episode
+    assert out[1].tolist() == [[8, 9], [10, 11], [10, 11], [10, 11]]
+    assert not np.isnan(out).any()
+    # starting on a NaN row with nothing valid before it -> zeros
+    assert build_replay_actions(col, offsets, lengths, [0], [3], 2).tolist() == [[[0, 0], [0, 0]]]

@@ -110,6 +110,23 @@ def fmt_mean_ci(mean: float, half: float) -> str:
     return f"{mean:.1f} ± {half:.1f}" if not math.isnan(half) else f"{mean:.1f} ± n/a"
 
 
+def crosstab(plan: Iterable[bool], replay: Iterable[bool]) -> dict[str, int]:
+    """Per-episode cross-tabulation of planner success against dataset-replay success.
+
+    Both sequences must refer to the same episodes in the same order.
+    ``plan_fail_replay_fail`` counts planner failures on episodes where even the
+    dataset's own actions do not reach the goal (not attributable to the model).
+    """
+    plan, replay = [bool(x) for x in plan], [bool(x) for x in replay]
+    if len(plan) != len(replay):
+        raise ValueError("plan and replay cover different numbers of episodes")
+    out = {"n": len(plan), "plan_ok_replay_ok": 0, "plan_ok_replay_fail": 0,
+           "plan_fail_replay_ok": 0, "plan_fail_replay_fail": 0}
+    for p, r in zip(plan, replay):
+        out[f"plan_{'ok' if p else 'fail'}_replay_{'ok' if r else 'fail'}"] += 1
+    return out
+
+
 def replace_block(text: str, name: str, body: str) -> str:
     """Replace the content between ``<!-- BEGIN:name -->`` and ``<!-- END:name -->``.
 

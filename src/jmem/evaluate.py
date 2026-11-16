@@ -60,8 +60,16 @@ def run_official_eval(
     paths: Paths | None = None,
     extra_overrides: Sequence[str] = (),
     force: bool = False,
+    mode: str = "plan",
 ) -> dict[str, Any]:
     """Run the official LeWM evaluation for one env and return the captured record.
+
+    ``mode="replay"`` is a diagnostic: same episode sampling, state/goal setting
+    and success test, but the planner is replaced by an open-loop replay of the
+    dataset's own actions for ``goal_offset`` steps (no model involved; ``policy``
+    is ignored). It measures how often the simulator, started from a dataset
+    state, reaches the dataset's goal when given the dataset's actions: a
+    ceiling set by the data and simulator, independent of the world model.
 
     The record (also written to ``<out_dir>/official_<env>_n<num_eval>_s<seed>.json``)
     contains the runtime arguments, planner settings, metrics and the Hydra
@@ -81,7 +89,10 @@ def run_official_eval(
     paths = paths or get_paths()
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"official_{env}_n{num_eval}_s{seed}"
+    if mode not in ("plan", "replay"):
+        raise ValueError(f"unknown mode {mode!r}")
+    prefix = "official" if mode == "plan" else "replay"
+    tag = f"{prefix}_{env}_n{num_eval}_s{seed}"
     record_path = out_dir / f"{tag}.json"
     if record_path.exists() and not force:
         print(f"[eval] reusing {record_path}")
@@ -90,10 +101,17 @@ def run_official_eval(
     hydra_dir = out_dir / f"{tag}_hydra"
     raw_path = out_dir / f"{tag}.raw.json"
     raw_path.unlink(missing_ok=True)
+    if mode == "replay":
+        # `policy=random` skips model loading; an absolute output.filename keeps
+        # eval.py from writing its text log into the le-wm checkout (eval.py:105, 157)
+        policy = "random"
+        log_path = (out_dir / f"{tag}.txt").resolve().as_posix()
+        extra_overrides = [*extra_overrides, f"output.filename={log_path}"]
     cmd = official_eval_command(
         env, policy, num_eval, seed, paths.data_home, hydra_dir, extra_overrides
     )
     child_env = dict(os.environ)
+    child_env["JMEM_EVAL_MODE"] = mode
     child_env["JMEM_LEWM_DIR"] = str(paths.lewm_dir)
     child_env["JMEM_EVAL_OUT"] = str(raw_path)
     child_env["STABLEWM_HOME"] = str(paths.swm_home)
@@ -110,6 +128,7 @@ def run_official_eval(
     hydra_cfg = hydra_dir / ".hydra" / "config.yaml"
     record["hydra_config"] = load_yaml(hydra_cfg) if hydra_cfg.exists() else None
     record["env"] = env
+    record["mode"] = mode
     record["policy_name"] = policy
     record["seed"] = seed
     record["wallclock_s"] = wall
@@ -184,6 +203,31 @@ def check_protocol(
         if want != got:
             mismatches.append(f"{name}: protocol={want!r} runtime={got!r}")
     return mismatches
+
+
+def build_replay_actions(action_col, offsets, lengths, episodes_idx, start_steps, n_steps):
+    """Dataset actions to replay open-loop from each evaluation start row.
+
+    Returns an array ``(n_envs, n_steps, action_dim)`` where entry ``[i, t]`` is the
+    raw (un-normalised) action stored at step ``start_steps[i] + t`` of episode
+    ``episodes_idx[i]``. Steps past the end of the episode, and NaN rows (swm
+    stores NaN for the action of an episode's final row), repeat the last valid
+    action (zeros if there is none).
+    """
+    import numpy as np
+
+    action_col = np.asarray(action_col)
+    out = np.zeros((len(episodes_idx), n_steps, action_col.shape[1]), dtype=np.float32)
+    for i, (ep, start) in enumerate(zip(episodes_idx, start_steps)):
+        last = np.zeros(action_col.shape[1], dtype=np.float32)
+        for t in range(n_steps):
+            step = int(start) + t
+            if step < int(lengths[ep]):
+                a = action_col[int(offsets[ep]) + step]
+                if not np.isnan(a).any():
+                    last = a.astype(np.float32)
+            out[i, t] = last
+    return out
 
 
 # --------------------------------------------------------------------------- #

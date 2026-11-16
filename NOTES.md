@@ -314,6 +314,27 @@ generated from them. Regenerating tables: `python -m jmem._regen`.
   diagnostics first: per-seed spread at more episodes, library versions), or
   accept and document.
 
+### PushT diagnostics plan (2026-11-16, approved by the human)
+
+`notebooks/01b_diagnose_pusht.ipynb`, ≤ 0.4 L4-h, no training:
+- **A. Dataset-replay ceiling** (`run_official_eval(..., mode="replay")`): same
+  episodes / start state / goal / success test, planner replaced by the
+  dataset's own 25 actions. Cross-tabulated per episode against the planner.
+  Reading: replay ≈ 100 % → simulator and data agree, the gap is the model or
+  planner; replay well below 100 % → part of the gap is data/simulator
+  inconsistency (library drift, or state not fully restored).
+  Caveat: `PushT._set_state` (`swm/envs/pusht/env.py:514-527`) restores agent and
+  block pose and the *agent* velocity only — block linear/angular velocity is
+  not restored — so replay need not be exact even on the authors' machine.
+  Replay is a diagnostic, not an upper bound on the planner (closed-loop
+  planning can succeed where open-loop replay misses).
+- **B. Seven extra evaluation seeds** (45–51, 350 episodes) on the released
+  PushT checkpoint, kept out of the reproduction table (`results/diagnostics/`).
+- Not possible: comparing library versions with the authors' — neither le-wm
+  nor swm ships a lock file, and the HF model card states no versions.
+- Local check: replay mode on a self-collected 4-episode TwoRoom dataset gives
+  2/2, i.e. the action alignment is right when data and simulator match.
+
 ### Epochs: the human points to Appendix E (10 epochs for every environment)
 
 The repo config says 100 (`config/train/lewm.yaml:18`); the paper trains for 10.
