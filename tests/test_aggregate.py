@@ -79,6 +79,17 @@ def test_load_results_validates(tmp_path):
         aggregate.load_results(tmp_path)
 
 
+def test_replace_block():
+    text = "a\n<!-- BEGIN:t -->\nold\n<!-- END:t -->\nb\n"
+    out = aggregate.replace_block(text, "t", "new 1\nnew 2\n")
+    assert out == "a\n<!-- BEGIN:t -->\nnew 1\nnew 2\n<!-- END:t -->\nb\n"
+    assert aggregate.replace_block(out, "t", "new 1\nnew 2") == out  # idempotent
+    with pytest.raises(ValueError):
+        aggregate.replace_block("no markers", "t", "x")
+    with pytest.raises(ValueError):
+        aggregate.replace_block(text + text, "t", "x")
+
+
 def test_reproduction_table_verdicts(tmp_path):
     _write(tmp_path, {42: 40, 43: 42, 44: 44})
     _write(tmp_path, {42: 30, 43: 30, 44: 30}, env="pusht")

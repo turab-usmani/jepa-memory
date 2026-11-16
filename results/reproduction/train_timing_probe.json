@@ -1,0 +1,71 @@
+{
+  "finished": true,
+  "global_step": 300,
+  "steps_per_epoch": 5138,
+  "max_epochs": 1,
+  "max_steps": 300,
+  "batch_size": 128,
+  "num_workers": 6,
+  "precision": "bf16-mixed",
+  "device": "cuda:0",
+  "step_time": {
+    "n_intervals": 240,
+    "n_warmup_skipped": 59,
+    "median_s": 0.6014421354998376,
+    "mean_s": 0.6020841217249995,
+    "max_s": 0.624515386999974
+  },
+  "fit_wallclock_s": 192.49572516099988,
+  "data": "tworoom",
+  "subdir": "timing_probe",
+  "command": [
+    "/usr/bin/python3",
+    "-m",
+    "jmem._official_train_runner",
+    "data=tworoom",
+    "subdir=timing_probe",
+    "output_model_name=timing_probe",
+    "hydra.run.dir=/content/drive/MyDrive/jmem/results/reproduction/train_timing_probe_hydra",
+    "+trainer.max_steps=300",
+    "+trainer.limit_val_batches=0",
+    "trainer.max_epochs=1"
+  ],
+  "wallclock_s": 211.58608008400006,
+  "git_sha": "cac811eaaff28dbc28dde5c351e71bd848cdb253-dirty",
+  "versions": {
+    "python": "3.13.16",
+    "torch": "2.14.1+cu130",
+    "torchvision": "0.29.1+cu130",
+    "numpy": "2.4.6",
+    "stable-worldmodel": "0.1.1",
+    "stable-pretraining": "0.1.8",
+    "transformers": "4.57.6",
+    "lightning": "2.6.6",
+    "hydra-core": "1.3.8",
+    "omegaconf": "2.3.1",
+    "gymnasium": "1.4.0",
+    "scikit-learn": "1.9.1",
+    "h5py": "3.14.0",
+    "hdf5plugin": "7.1.0",
+    "pymunk": "7.3.1",
+    "pygame": "2.6.1"
+  },
+  "hardware": "L4",
+  "timestamp": "2026-11-16T12:16:36+00:00",
+  "estimates": {
+    "100": {
+      "median_step_s": 0.6014421354998376,
+      "steps_per_epoch": 5138.0,
+      "total_steps": 513800.0,
+      "hours_per_epoch": 0.8583915811661571,
+      "hours_total": 85.8391581166157
+    },
+    "10": {
+      "median_step_s": 0.6014421354998376,
+      "steps_per_epoch": 5138.0,
+      "total_steps": 51380.0,
+      "hours_per_epoch": 0.8583915811661571,
+      "hours_total": 8.583915811661571
+    }
+  }
+}

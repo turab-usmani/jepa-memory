@@ -1,0 +1,174 @@
+{
+  "run_id": "official-tworoom-released-s43",
+  "git_sha": "f73ceebbcc8007a93d4a78c8d576b172bfeb115b-dirty",
+  "env": "swm/TwoRoom-v1",
+  "perturbation": {
+    "name": "none"
+  },
+  "predictor": "transformer_h3",
+  "params_predictor": 10791360,
+  "train_seed": null,
+  "eval_seed": 43,
+  "protocol": {
+    "common": {
+      "num_eval": 50,
+      "goal_offset_steps": 25,
+      "eval_budget": 50,
+      "max_episode_steps": 100,
+      "img_size": 224,
+      "world_image_shape": [
+        224,
+        224
+      ],
+      "seed": 42,
+      "plan": {
+        "horizon": 5,
+        "receding_horizon": 5,
+        "action_block": 5,
+        "history_len": 1,
+        "warm_start": true
+      },
+      "solver": {
+        "target": "stable_worldmodel.solver.CEMSolver",
+        "num_samples": 300,
+        "n_steps": 30,
+        "topk": 30,
+        "var_scale": 1.0,
+        "batch_size": 1
+      },
+      "context_frames_at_plan_time": 1,
+      "planner_calls_per_episode": 2,
+      "goal_construction": {
+        "start": "dataset row (episode e, step s), sampled as below; env reset then forced to that row's state via `callables`",
+        "goal_image": "dataset `pixels` frame of the SAME episode at step s + goal_offset_steps (world.py:570-596)",
+        "goal_state": "same row's columns, exposed as goal_<col>, pushed into the env via `callables`",
+        "goal_fixed": "goal keys are re-written into infos after every env step (world.py:532, 542)",
+        "success": "any step with terminated=True within eval_budget (world.py:543); success_rate in percent",
+        "preprocessing": "pixels and goal: ToImage -> float32 [0,1] -> ImageNet Normalize -> Resize(224) (eval.py:17-26)",
+        "action_scaling": "sklearn StandardScaler fit on dataset actions with NaN rows dropped; planner works in z-scored space (eval.py:71-79, policy.py:436-437)"
+      },
+      "episode_selection": {
+        "valid_rows": "rows with step_idx <= episode_len - goal_offset_steps - 1",
+        "sampler": "np.random.default_rng(seed).choice(len(valid_rows) - 1, size=num_eval, replace=False), then sorted",
+        "one_env_per_episode": true
+      }
+    },
+    "env": {
+      "env_name": "swm/TwoRoom-v1",
+      "dataset_name": "tworoom",
+      "checkpoint": "quentinll/lewm-tworooms",
+      "keys_to_cache": [
+        "action",
+        "proprio"
+      ],
+      "world_kwargs": {},
+      "callables": [
+        {
+          "method": "_set_state",
+          "args": {
+            "state": {
+              "value": "proprio"
+            }
+          }
+        },
+        {
+          "method": "_set_goal_state",
+          "args": {
+            "goal_state": {
+              "value": "goal_proprio"
+            }
+          }
+        }
+      ]
+    },
+    "source": {
+      "le_wm_commit": "8edfeb336732b5f3ce7b8b210d0ba370a09e2cac",
+      "stable_worldmodel_version": "0.1.1",
+      "entrypoint": "third_party/le-wm/eval.py"
+    },
+    "mismatches": []
+  },
+  "success": {
+    "25": 0.84
+  },
+  "n_episodes": 50,
+  "episode_successes": {
+    "25": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "rollout_mse": null,
+  "probe_r2": null,
+  "latency_ms_median": null,
+  "hardware": "L4",
+  "wallclock_s": 110.40691859799995,
+  "timestamp": "2026-11-16T11:51:47+00:00",
+  "context": "official_1frame",
+  "versions": {
+    "python": "3.13.16",
+    "torch": "2.14.1+cu130",
+    "torchvision": "0.29.1+cu130",
+    "numpy": "2.4.6",
+    "stable-worldmodel": "0.1.1",
+    "stable-pretraining": "0.1.8",
+    "transformers": "4.57.6",
+    "lightning": "2.6.6",
+    "hydra-core": "1.3.8",
+    "omegaconf": "2.3.1",
+    "gymnasium": "1.4.0",
+    "scikit-learn": "1.9.1",
+    "h5py": "3.14.0",
+    "hdf5plugin": "7.1.0",
+    "pymunk": "7.3.1",
+    "pygame": "2.6.1"
+  }
+}

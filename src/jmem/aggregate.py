@@ -110,6 +110,20 @@ def fmt_mean_ci(mean: float, half: float) -> str:
     return f"{mean:.1f} ± {half:.1f}" if not math.isnan(half) else f"{mean:.1f} ± n/a"
 
 
+def replace_block(text: str, name: str, body: str) -> str:
+    """Replace the content between ``<!-- BEGIN:name -->`` and ``<!-- END:name -->``.
+
+    Used to inject generated tables into README / reports so numbers are never
+    typed by hand. Raises if the markers are missing or duplicated.
+    """
+    begin, end = f"<!-- BEGIN:{name} -->", f"<!-- END:{name} -->"
+    if text.count(begin) != 1 or text.count(end) != 1 or text.index(begin) > text.index(end):
+        raise ValueError(f"expected exactly one ordered marker pair for block {name!r}")
+    head, rest = text.split(begin)
+    _, tail = rest.split(end)
+    return f"{head}{begin}\n{body.strip()}\n{end}{tail}"
+
+
 def reproduction_table(
     rows: list[dict[str, Any]], references: dict[str, dict[str, Any]], tolerance: float = 5.0
 ) -> str:

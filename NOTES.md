@@ -289,6 +289,40 @@ a P2 grid of 4 envs × 3–4 conditions × 5–6 predictors × 3 seeds) is not
 feasible end-to-end at any epoch count close to the official one. Needs a
 decision — Q6 below.
 
+### Reproduction verdict with the PushT reference (2026-11-16)
+
+Results JSON are now committed in `results/reproduction/`; the README table is
+generated from them. Regenerating tables: `python -m jmem._regen`.
+
+- PushT reference supplied by the human: **96.0 ± 2.83** (LeWM paper Table 5,
+  mean over 3 *training* seeds, same 50-step / 25-ahead protocol). Ours:
+  **89.3 ± 5.7**, per seed 92/88/88, pooled Wilson [83.4, 93.3]. Delta = -6.7:
+  **outside the ±5 band** (band is [91, 100]). The pooled Wilson interval excludes
+  96, so this is unlikely to be evaluation noise alone.
+- TwoRoom: 85.3 vs 87, **inside** the band.
+- Not like-for-like: the paper averages three trained models; we evaluate the one
+  released checkpoint on three episode sets. Candidate causes, none tested yet:
+  (1) the released PushT checkpoint is weaker than the paper's seeds;
+  (2) library drift (torch 2.14 / gymnasium 1.4 / pymunk 7.3 vs whatever the
+      authors used) changing PushT physics or rendering;
+  (3) the released `.h5` differing from the authors' evaluation data;
+  (4) image resize / interpolation differences in the env wrapper.
+  Sub-JEPA's independent LeWM number in the brief (84.67 ± 6.53) is below ours,
+  so a value near 89 is not unusual for third-party runs.
+- Gate A's first criterion ("within ±5 under the config protocol") is therefore
+  met on TwoRoom and **not met on PushT**. Needs a decision: debug PushT (cheap
+  diagnostics first: per-seed spread at more episodes, library versions), or
+  accept and document.
+
+### Epochs: the human points to Appendix E (10 epochs for every environment)
+
+The repo config says 100 (`config/train/lewm.yaml:18`); the paper trains for 10.
+The human treats 10 as the intended schedule. Measured cost of a 10-epoch
+TwoRoom run is **8.6 L4-h** (0.601 s/step × 51,380 steps, lower bound) — not the
+1.4–4.3 L4-h range, which came from my pre-probe guess of 0.1–0.3 s/step and is
+superseded by the measurement. At 8.6 L4-h per run the budget holds about 17
+end-to-end TwoRoom runs in total, so Q6 is still open.
+
 ## 4. Open questions (need the human's decision)
 
 - **Q6 — how do we train within 150 L4-h?** (from the probe above)

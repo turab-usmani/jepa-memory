@@ -43,13 +43,17 @@ Results, checkpoints, the compute ledger and pip lock files go to
 
 ## Results
 
-| Env | Protocol | Success (%) | Source |
-|---|---|---|---|
-| TwoRoom | official config, released checkpoint | TODO(result) | `results/` |
-| PushT | official config, released checkpoint | TODO(result) | `results/` |
+Reproduction of the released checkpoints under the official config protocol
+(50 episodes × evaluation seeds 42/43/44, goal 25 steps ahead, 50-step budget).
+The block below is generated from `results/reproduction/official-*.json` by
+`jmem.aggregate` (see `NOTES.md`, "Regenerating tables"); nothing is typed by hand.
 
-Every number in this table must be generated from a results JSON by
-`jmem.aggregate` (Phase 1); nothing is typed by hand.
+<!-- BEGIN:reproduction -->
+| Env | Seeds | Episodes | Success % (mean ± 95% t-CI over seeds) | Wilson 95% (pooled) | Per seed | Reference | Δ | Within ±5 |
+|---|---|---|---|---|---|---|---|---|
+| swm/PushT-v1 | 3 | 150 | 89.3 ± 5.7 | [83.4, 93.3] | 92, 88, 88 | 96.0 (LeWM paper Table 5 (96.0 ± 2.83, mean over 3 training seeds), supplied by the human 2026-11-16) | -6.7 | FAIL |
+| swm/TwoRoom-v1 | 3 | 150 | 85.3 ± 2.9 | [78.8, 90.1] | 86, 84, 86 | 87.0 (project brief §1.1: 'only the config protocol reproduces the reported ~87%' (via arXiv 2608.10145)) | -1.7 | PASS |
+<!-- END:reproduction -->
 
 ## Compute budget
 
